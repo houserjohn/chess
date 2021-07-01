@@ -22,6 +22,13 @@ const reducer = (
       };
     }
 
+    case "tiles/set": {
+      return {
+        ...state,
+        tiles: action.payload,
+      };
+    }
+
     case "path/set_grid": {
       return {
         ...state,

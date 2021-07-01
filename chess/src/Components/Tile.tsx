@@ -1,5 +1,6 @@
 import React from "react";
 import styled from "styled-components";
+import store from "../store";
 
 import Piece from "./Piece";
 
@@ -34,20 +35,28 @@ const TD = styled.td<TD_Props>`
 // `;
 
 window.addEventListener("mouseup", (e) => {
-  console.log("mouse left released window");
+  const saved_state: any = store.getState();
+  const game = saved_state["game"];
+  document.body.style.cursor = "auto";
+  game.unselect_piece();
+  //console.log("mouse left released window");
 });
 
 function Tile(props: Props) {
   const piece_here: any = props.board[props.row][props.col];
+  const saved_state: any = store.getState();
+  const game = saved_state["game"];
 
   function click(e: any) {
     e.preventDefault();
-    console.log("Hello");
+    //console.log("Hello");
+    //game.select_piece();
     //document.body.style.cursor = "crosshair";
   }
 
   function release(e: any) {
     e.preventDefault();
+    game.attempt_move_piece(props.row, props.col);
     //console.log("Bye");
     //document.body.style.cursor = "crosshair";
   }
@@ -55,7 +64,12 @@ function Tile(props: Props) {
   return (
     <TD tile_color={props.tile_color} onMouseDown={click} onMouseUp={release}>
       {piece_here !== null && (
-        <Piece color={piece_here.color} piece_type={piece_here.piece_type} />
+        <Piece
+          color={piece_here.color}
+          piece_type={piece_here.piece_type}
+          row={props.row}
+          col={props.col}
+        />
       )}
     </TD>
   );

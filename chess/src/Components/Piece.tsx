@@ -1,5 +1,6 @@
 import React from "react";
 import styled from "styled-components";
+import store from "../store";
 
 interface Props {
   tile_color?: string;
@@ -12,13 +13,20 @@ const PIECE = styled.p<Props>`
   background-size: cover;
   width: 100%;
   height: 100%;
-  cursor: grab;
+  &:hover {
+    cursor: grab;
+  }
+  &:active {
+    cursor: grabbing;
+  }
   ${(p) => (p.color === "white" ? "filter: invert(100%)" : "")}
 `;
 
 interface Piece_Props {
   color: string;
   piece_type: string;
+  row: number;
+  col: number;
 }
 
 // window.addEventListener("mousedown", (e) => {
@@ -26,8 +34,12 @@ interface Piece_Props {
 // });
 
 function Piece(props: Piece_Props) {
+  const saved_state: any = store.getState();
+  const game = saved_state["game"];
+
   function click(e: any) {
     e.preventDefault();
+    game.select_piece(props.row, props.col);
     //document.body.style.cursor = "crosshair";
   }
 
