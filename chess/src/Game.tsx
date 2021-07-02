@@ -1,6 +1,31 @@
 // The game class that handles all of the logic
 import store from "./store";
 
+// returns default tiles that you can manipulate
+const get_default_tiles = (tiles: any): any => {
+  for (let i = 0; i < 8; i++) {
+    tiles.push([]);
+    for (let j = 0; j < 8; j++) {
+      let color = "white";
+      if ((i * 9 + j) % 2) {
+        color = "green";
+      }
+      tiles[i].push(color);
+    }
+  }
+  return tiles;
+};
+
+const reset_tiles = (): any => {
+  // generate the tiles colors
+  let tiles: any = [];
+  get_default_tiles(tiles);
+  store.dispatch({
+    type: "tiles/set",
+    payload: tiles,
+  });
+};
+
 const get_board = () => {
   let state: any = store.getState();
   let board = state["board"];
@@ -21,26 +46,47 @@ class Piece {
     this.has_moved = false;
   }
 
+  // Each piece will handle this differently
   is_valid_move(row: number, col: number) {
     return true;
   }
 
-  // optimize this later
-  get_available_moves() {
+  show_available_moves() {
+    let tiles: any = [];
+    get_default_tiles(tiles);
+
     let moves: any = [];
-    for (let i = 0; i < 8; i++) {
-      for (let j = 0; j < 8; i++) {
-        if (this.is_valid_move(i, j)) {
-          moves.push([i, j]);
-        }
-      }
+    this.get_available_moves(moves);
+
+    for (let move of moves) {
+      tiles[move[0]][move[1]] = "blue";
     }
-    return moves;
+    /*
+    for (let i = 0; i < 8; i++) {
+      tiles[0][i] = "blue";
+    }
+    */
+
+    //let moves: any = this.get_available_moves();
+    /*
+    console.log("hello");
+    for (let move in moves) {
+      tiles[move[0]][move[1]] = "blue";
+      console.log(move[0] + ", " + move[1]);
+    }
+    */
+    store.dispatch({
+      type: "tiles/set",
+      payload: tiles,
+    });
   }
+
+  get_available_moves(moves: any) {}
 
   move(row: number, col: number, old_loc: any) {
     if (old_loc.row !== row || old_loc.col !== col) {
       if (this.is_valid_move(row, col)) {
+        this.has_moved = true;
         let old_board: any = get_board();
         let new_board: any = [];
         copy_chessboard(old_board, new_board);
@@ -77,6 +123,18 @@ class Pawn extends Piece {
     }
     return false;
   }
+
+  get_available_moves(moves: any) {
+    moves.push([this.row - 1, this.col]);
+    moves.push([this.row - 2, this.col]);
+    return moves;
+  }
+
+  /*
+  // must have this for game to be able to call it
+  show_available_moves() {
+    console.log("Hello");
+  }*/
 }
 
 class Rook extends Piece {
@@ -184,25 +242,6 @@ const reset_chessboard = (): any => {
   });
 };
 
-const reset_tiles = (): any => {
-  // generate the tiles colors
-  let tiles: any = [];
-  for (let i = 0; i < 8; i++) {
-    tiles.push([]);
-    for (let j = 0; j < 8; j++) {
-      let color = "white";
-      if ((i * 9 + j) % 2) {
-        color = "green";
-      }
-      tiles[i].push(color);
-    }
-  }
-  store.dispatch({
-    type: "tiles/set",
-    payload: tiles,
-  });
-};
-
 class Game {
   current_piece: any;
   has_selected_piece: boolean;
@@ -216,12 +255,21 @@ class Game {
   select_piece(row: number, col: number) {
     this.has_selected_piece = true;
     this.selected_piece_location = { row: row, col: col };
+    let board: any = get_board();
+    //console.log(board[row][col]);
+    board[row][col].show_available_moves();
     //document.body.style.cursor = "grabbing";
   }
 
   unselect_piece() {
     //console.log("unselect");
     this.has_selected_piece = false;
+    let tiles: any = [];
+    get_default_tiles(tiles);
+    store.dispatch({
+      type: "tiles/set",
+      payload: tiles,
+    });
   }
 
   // user attempt to move piece
