@@ -32,12 +32,28 @@ const get_board = () => {
   return board;
 };
 
+// maybe consider just passing this around
+const get_tile_number_from_row_and_col = (row: number, col: number): number => {
+  return 8 * row + col;
+};
+
+const get_row_and_col_from_tile_number = (tile_number: number): any => {
+  let row: number = Math.floor(tile_number / 8);
+  let col: number = tile_number % 8;
+  return { row: row, col: col };
+  /*
+  row = math.floor(i/8)
+  col = i%8
+  */
+};
+
 class Piece {
   piece_type: string;
   color: string;
   row: number;
   col: number;
   has_moved: boolean;
+  available_moves: any;
   constructor() {
     this.piece_type = "";
     this.color = "";
@@ -46,21 +62,71 @@ class Piece {
     this.has_moved = false;
   }
 
+  // Returns true if valid row and col (e.g. not -1 or 9 for row/col)
+  is_valid_tile(row: number, col: number) {
+    if (row > 7 || row < 0) {
+      return false;
+    }
+    if (col > 7 || col < 0) {
+      return false;
+    }
+    return true;
+  }
+  /*
   // Each piece will handle this differently
   is_valid_move(row: number, col: number) {
     return true;
+  }
+  */
+
+  // returns true if row, col is a valid move
+  is_valid_move(row: number, col: number) {
+    //let board: any = get_board();
+    //if (this.color === "white") {
+    let tile_number: number = get_tile_number_from_row_and_col(row, col);
+    if (tile_number in this.available_moves) {
+      // available_moves was precomputed when user clicked piece
+      return true;
+    }
+    /*
+      if (row === this.row - 1) {
+        return true;
+      }*/
+    //}
+    return false;
+  }
+
+  // Returns enemy color
+  get_opponent_color() {
+    if (this.color === "white") {
+      return "black";
+    }
+    return "white";
   }
 
   show_available_moves() {
     let tiles: any = [];
     get_default_tiles(tiles);
 
-    let moves: any = [];
+    let moves: any = {};
     this.get_available_moves(moves);
 
+    for (const move in moves) {
+      let rowcol: any = get_row_and_col_from_tile_number(parseInt(move));
+      let row: number = rowcol["row"];
+      let col: number = rowcol["col"];
+      if (moves[move] === "move") {
+        tiles[row][col] = "blue";
+      } else {
+        tiles[row][col] = "red";
+      }
+    }
+
+    /*
     for (let move of moves) {
       tiles[move[0]][move[1]] = "blue";
     }
+    */
     /*
     for (let i = 0; i < 8; i++) {
       tiles[0][i] = "blue";
@@ -112,21 +178,74 @@ class Pawn extends Piece {
     this.color = color;
     this.row = row;
     this.col = col;
+    this.available_moves = null;
   }
 
+  // this will return -1 for white and 1 for black (so they move towards eachother)
+  get_forward_move() {
+    if (this.color === "black") {
+      return 1;
+    }
+    return -1;
+  }
+
+  /*
+  // returns true if row, col is a valid move
   is_valid_move(row: number, col: number) {
-    let board: any = get_board();
-    if (this.color === "white") {
+    //let board: any = get_board();
+    //if (this.color === "white") {
+    let tile_number: number = get_tile_number_from_row_and_col(row, col);
+    if (tile_number in this.available_moves) {
+      // available_moves was precomputed when user clicked piece
+      return true;
+    }
+    /*
       if (row === this.row - 1) {
         return true;
+      }*/
+  //}
+  //return false;
+  //}
+
+  // returns dictionary of tile_number to boolean (maybe consider the color there or piece)
+  get_available_moves(moves: any) {
+    let board: any = get_board();
+
+    // moving one step forward
+    let row: number = this.row + this.get_forward_move();
+    let col: number = this.col;
+    if (this.is_valid_tile(row, col) && board[row][col] == null) {
+      moves[get_tile_number_from_row_and_col(row, col)] = "move";
+
+      // moving two steps forward
+      row = this.row + 2 * this.get_forward_move();
+      col = this.col;
+      if (
+        this.is_valid_tile(row, col) && // not an invalid tile
+        board[row][col] == null && // no piece is there
+        !this.has_moved // hasn't moved already
+      ) {
+        moves[get_tile_number_from_row_and_col(row, col)] = "move";
       }
     }
-    return false;
-  }
 
-  get_available_moves(moves: any) {
-    moves.push([this.row - 1, this.col]);
-    moves.push([this.row - 2, this.col]);
+    // taking diagonally left and right
+    for (let i = -1; i <= 1; i += 2) {
+      row = this.row + this.get_forward_move();
+      col = this.col + i;
+      if (
+        this.is_valid_tile(row, col) && // valid tile
+        board[row][col] !== null && // if a piece is there
+        board[row][col].color === this.get_opponent_color() // make sure it is enemy
+      ) {
+        moves[get_tile_number_from_row_and_col(row, col)] = "take";
+      }
+    }
+
+    // todo add en passant
+
+    // create a dictionary for each available
+    this.available_moves = moves; // cache available moves
     return moves;
   }
 
@@ -144,6 +263,68 @@ class Rook extends Piece {
     this.color = color;
     this.row = row;
     this.col = col;
+    this.available_moves = null;
+  }
+
+  check_rook_move(
+    row: number,
+    col: number,
+    board: any,
+    moves: any,
+    callback_while: any
+  ) {
+    let rowcol: any = callback_while(row, col);
+    row = rowcol["row"];
+    col = rowcol["col"];
+    while (this.is_valid_tile(row, col) && board[row][col] == null) {
+      moves[get_tile_number_from_row_and_col(row, col)] = "move";
+
+      let rowcol: any = callback_while(row, col);
+      row = rowcol["row"];
+      col = rowcol["col"];
+    }
+
+    // checking if can take
+    if (
+      this.is_valid_tile(row, col) &&
+      board[row][col] !== null &&
+      board[row][col].color === this.get_opponent_color()
+    ) {
+      moves[get_tile_number_from_row_and_col(row, col)] = "take";
+    }
+  }
+
+  // returns dictionary of tile_number to boolean (maybe consider the color there or piece)
+  get_available_moves(moves: any) {
+    let board: any = get_board();
+
+    // up direction
+    let up_move = (row: number, col: number): any => {
+      return { row: row - 1, col: col };
+    };
+    this.check_rook_move(this.row, this.col, board, moves, up_move);
+
+    // left direction
+    let left_move = (row: number, col: number): any => {
+      return { row: row, col: col - 1 };
+    };
+    this.check_rook_move(this.row, this.col, board, moves, left_move);
+
+    // right direction
+    let right_move = (row: number, col: number): any => {
+      return { row: row, col: col + 1 };
+    };
+    this.check_rook_move(this.row, this.col, board, moves, right_move);
+
+    // down direction
+    let down_move = (row: number, col: number): any => {
+      return { row: row + 1, col: col };
+    };
+    this.check_rook_move(this.row, this.col, board, moves, down_move);
+
+    // create a dictionary for each available
+    this.available_moves = moves; // cache available moves
+    return moves;
   }
 }
 
@@ -154,6 +335,38 @@ class Knight extends Piece {
     this.color = color;
     this.row = row;
     this.col = col;
+    this.available_moves = null;
+  }
+
+  check_knight_move(row: number, col: number, board: any, moves: any) {
+    if (this.is_valid_tile(row, col) && board[row][col] === null) {
+      moves[get_tile_number_from_row_and_col(row, col)] = "move";
+    } else if (
+      this.is_valid_tile(row, col) &&
+      board[row][col] !== null &&
+      board[row][col].color === this.get_opponent_color()
+    ) {
+      moves[get_tile_number_from_row_and_col(row, col)] = "take";
+    }
+  }
+
+  // returns dictionary of tile_number to boolean (maybe consider the color there or piece)
+  get_available_moves(moves: any) {
+    let board: any = get_board();
+
+    let row: number = this.row;
+    let col: number = this.col;
+    this.check_knight_move(row - 2, col - 1, board, moves);
+    this.check_knight_move(row - 2, col + 1, board, moves);
+    this.check_knight_move(row - 1, col - 2, board, moves);
+    this.check_knight_move(row + 1, col - 2, board, moves);
+    this.check_knight_move(row - 1, col + 2, board, moves);
+    this.check_knight_move(row + 1, col + 2, board, moves);
+    this.check_knight_move(row + 2, col - 1, board, moves);
+    this.check_knight_move(row + 2, col + 1, board, moves);
+
+    this.available_moves = moves;
+    return moves;
   }
 }
 
@@ -164,6 +377,67 @@ class Bishop extends Piece {
     this.color = color;
     this.row = row;
     this.col = col;
+    this.available_moves = null;
+  }
+
+  check_bishop_move(
+    row: number,
+    col: number,
+    board: any,
+    moves: any,
+    callback_while: any
+  ) {
+    let rowcol: any = callback_while(row, col);
+    row = rowcol["row"];
+    col = rowcol["col"];
+    while (this.is_valid_tile(row, col) && board[row][col] === null) {
+      moves[get_tile_number_from_row_and_col(row, col)] = "move";
+      let rowcol: any = callback_while(row, col);
+      row = rowcol["row"];
+      col = rowcol["col"];
+    }
+    if (
+      this.is_valid_tile(row, col) &&
+      board[row][col] !== null &&
+      board[row][col].color === this.get_opponent_color()
+    ) {
+      moves[get_tile_number_from_row_and_col(row, col)] = "take";
+    }
+  }
+
+  // returns dictionary of tile_number to boolean (maybe consider the color there or piece)
+  get_available_moves(moves: any) {
+    let board: any = get_board();
+
+    let row: number = this.row;
+    let col: number = this.col;
+
+    // up-right diagonal
+    let up_right = (row: number, col: number): any => {
+      return { row: row - 1, col: col + 1 };
+    };
+    this.check_bishop_move(row, col, board, moves, up_right);
+
+    // up-left diagonal
+    let up_left = (row: number, col: number): any => {
+      return { row: row - 1, col: col - 1 };
+    };
+    this.check_bishop_move(row, col, board, moves, up_left);
+
+    // down-right diagonal
+    let down_right = (row: number, col: number): any => {
+      return { row: row + 1, col: col + 1 };
+    };
+    this.check_bishop_move(row, col, board, moves, down_right);
+
+    // down-left diagonal
+    let down_left = (row: number, col: number): any => {
+      return { row: row + 1, col: col - 1 };
+    };
+    this.check_bishop_move(row, col, board, moves, down_left);
+
+    this.available_moves = moves;
+    return moves;
   }
 }
 
@@ -174,6 +448,118 @@ class Queen extends Piece {
     this.color = color;
     this.row = row;
     this.col = col;
+    this.available_moves = null;
+  }
+
+  check_bishop_move(
+    row: number,
+    col: number,
+    board: any,
+    moves: any,
+    callback_while: any
+  ) {
+    let rowcol: any = callback_while(row, col);
+    row = rowcol["row"];
+    col = rowcol["col"];
+    while (this.is_valid_tile(row, col) && board[row][col] === null) {
+      moves[get_tile_number_from_row_and_col(row, col)] = "move";
+      let rowcol: any = callback_while(row, col);
+      row = rowcol["row"];
+      col = rowcol["col"];
+    }
+    if (
+      this.is_valid_tile(row, col) &&
+      board[row][col] !== null &&
+      board[row][col].color === this.get_opponent_color()
+    ) {
+      moves[get_tile_number_from_row_and_col(row, col)] = "take";
+    }
+  }
+
+  check_rook_move(
+    row: number,
+    col: number,
+    board: any,
+    moves: any,
+    callback_while: any
+  ) {
+    let rowcol: any = callback_while(row, col);
+    row = rowcol["row"];
+    col = rowcol["col"];
+    while (this.is_valid_tile(row, col) && board[row][col] == null) {
+      moves[get_tile_number_from_row_and_col(row, col)] = "move";
+
+      let rowcol: any = callback_while(row, col);
+      row = rowcol["row"];
+      col = rowcol["col"];
+    }
+
+    // checking if can take
+    if (
+      this.is_valid_tile(row, col) &&
+      board[row][col] !== null &&
+      board[row][col].color === this.get_opponent_color()
+    ) {
+      moves[get_tile_number_from_row_and_col(row, col)] = "take";
+    }
+  }
+
+  get_available_moves(moves: any) {
+    let board: any = get_board();
+
+    let row: number = this.row;
+    let col: number = this.col;
+
+    // up-right diagonal
+    let up_right = (row: number, col: number): any => {
+      return { row: row - 1, col: col + 1 };
+    };
+    this.check_bishop_move(row, col, board, moves, up_right);
+
+    // up-left diagonal
+    let up_left = (row: number, col: number): any => {
+      return { row: row - 1, col: col - 1 };
+    };
+    this.check_bishop_move(row, col, board, moves, up_left);
+
+    // down-right diagonal
+    let down_right = (row: number, col: number): any => {
+      return { row: row + 1, col: col + 1 };
+    };
+    this.check_bishop_move(row, col, board, moves, down_right);
+
+    // down-left diagonal
+    let down_left = (row: number, col: number): any => {
+      return { row: row + 1, col: col - 1 };
+    };
+    this.check_bishop_move(row, col, board, moves, down_left);
+
+    // up direction
+    let up_move = (row: number, col: number): any => {
+      return { row: row - 1, col: col };
+    };
+    this.check_rook_move(row, col, board, moves, up_move);
+
+    // left direction
+    let left_move = (row: number, col: number): any => {
+      return { row: row, col: col - 1 };
+    };
+    this.check_rook_move(row, col, board, moves, left_move);
+
+    // right direction
+    let right_move = (row: number, col: number): any => {
+      return { row: row, col: col + 1 };
+    };
+    this.check_rook_move(row, col, board, moves, right_move);
+
+    // down direction
+    let down_move = (row: number, col: number): any => {
+      return { row: row + 1, col: col };
+    };
+    this.check_rook_move(row, col, board, moves, down_move);
+
+    this.available_moves = moves;
+    return moves;
   }
 }
 
@@ -184,6 +570,40 @@ class King extends Piece {
     this.color = color;
     this.row = row;
     this.col = col;
+    this.available_moves = null;
+  }
+
+  check_king_move(row: number, col: number, board: any, moves: any) {
+    if (this.is_valid_tile(row, col) && board[row][col] === null) {
+      moves[get_tile_number_from_row_and_col(row, col)] = "move";
+    } else if (
+      this.is_valid_tile(row, col) &&
+      board[row][col] !== null &&
+      board[row][col].color === this.get_opponent_color()
+    ) {
+      moves[get_tile_number_from_row_and_col(row, col)] = "take";
+    }
+  }
+
+  get_available_moves(moves: any) {
+    let board: any = get_board();
+
+    let row: number = this.row;
+    let col: number = this.col;
+
+    // four corners
+    this.check_king_move(row + 1, col - 1, board, moves);
+    this.check_king_move(row + 1, col + 1, board, moves);
+    this.check_king_move(row - 1, col + 1, board, moves);
+    this.check_king_move(row - 1, col - 1, board, moves);
+    // four sides
+    this.check_king_move(row - 1, col, board, moves);
+    this.check_king_move(row + 1, col, board, moves);
+    this.check_king_move(row, col + 1, board, moves);
+    this.check_king_move(row, col - 1, board, moves);
+
+    this.available_moves = moves;
+    return moves;
   }
 }
 
