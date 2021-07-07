@@ -161,6 +161,14 @@ class Piece {
         this.row = row;
         this.col = col;
 
+        /*
+        // available_moves was precomputed when user clicked piece
+      this.just_moved_twice = false;
+      if (Math.abs(this.row - row) === 2) {
+        // determining if moved forward twice
+        this.just_moved_twice = true;
+      }
+        */
         store.dispatch({
           type: "board/set",
           payload: new_board,
@@ -172,6 +180,8 @@ class Piece {
 }
 
 class Pawn extends Piece {
+  just_moved_twice: boolean;
+
   constructor(color: string, row: number, col: number) {
     super();
     this.piece_type = "pawn";
@@ -179,6 +189,7 @@ class Pawn extends Piece {
     this.row = row;
     this.col = col;
     this.available_moves = null;
+    this.just_moved_twice = false;
   }
 
   // this will return -1 for white and 1 for black (so they move towards eachother)
@@ -188,24 +199,6 @@ class Pawn extends Piece {
     }
     return -1;
   }
-
-  /*
-  // returns true if row, col is a valid move
-  is_valid_move(row: number, col: number) {
-    //let board: any = get_board();
-    //if (this.color === "white") {
-    let tile_number: number = get_tile_number_from_row_and_col(row, col);
-    if (tile_number in this.available_moves) {
-      // available_moves was precomputed when user clicked piece
-      return true;
-    }
-    /*
-      if (row === this.row - 1) {
-        return true;
-      }*/
-  //}
-  //return false;
-  //}
 
   // returns dictionary of tile_number to boolean (maybe consider the color there or piece)
   get_available_moves(moves: any) {
@@ -242,18 +235,27 @@ class Pawn extends Piece {
       }
     }
 
-    // todo add en passant
+    // en passant
+    row = this.row;
+    col = this.col + 1;
+    if (
+      this.is_valid_tile(row, col) && // valid tile
+      board[row][col] !== null && // if a piece is there
+      board[row][col].color === this.get_opponent_color() && // make sure it is enemy
+      board[row][col].piece_type === "pawn" && // make sure it is a pawn
+      board[row][col].just_moved_twice === true // the other pawn just moved twice
+    ) {
+      moves[
+        get_tile_number_from_row_and_col(row + this.get_forward_move(), col)
+      ] = "take";
+    }
+
+    // add promotion
 
     // create a dictionary for each available
     this.available_moves = moves; // cache available moves
     return moves;
   }
-
-  /*
-  // must have this for game to be able to call it
-  show_available_moves() {
-    console.log("Hello");
-  }*/
 }
 
 class Rook extends Piece {
@@ -601,6 +603,8 @@ class King extends Piece {
     this.check_king_move(row + 1, col, board, moves);
     this.check_king_move(row, col + 1, board, moves);
     this.check_king_move(row, col - 1, board, moves);
+
+    // todo: adding castling
 
     this.available_moves = moves;
     return moves;
